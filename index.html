@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mi Tienda - Listo para GitHub Pages</title>
+  <style>
+    :root{--accent:#0f76d1}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;margin:0;background:#f4f7fb;color:#0b1720}
+    header{background:linear-gradient(90deg, rgba(15,118,209,0.08), transparent);padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+    .container{max-width:1100px;margin:18px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+    .card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(11,23,32,0.06)}
+    img.prod{width:100%;height:160px;object-fit:cover;border-radius:8px;background:#eef2f7}
+    .title{font-weight:600;margin:8px 0}
+    .price{color:var(--accent);font-weight:700}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-ghost{background:transparent;border:1px solid #e6eef7}
+    .topbar{display:flex;gap:12px;align-items:center}
+    .cart-btn{position:relative}
+    .badge{position:absolute;top:-8px;right:-8px;background:#e53e3e;color:#fff;border-radius:999px;padding:2px 7px;font-size:12px}
+    form label{display:block;font-size:13px;margin-top:8px}
+    input,textarea,select{width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef7;background:#fbfdff}
+    footer{padding:20px;text-align:center;color:#6b7280}
+    .admin-panel{display:none;margin-bottom:18px}
+    .muted{color:#546173;font-size:13px}
+    .small{font-size:13px}
+    h3.section-title{margin-top:24px;color:#0f172a}
+    @media (max-width:520px){img.prod{height:120px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:12px">
+      <strong>Mi Tienda</strong>
+      <small class="muted">Listo para GitHub Pages</small>
+    </div>
+    <div class="topbar container" style="max-width:none;justify-content:flex-end">
+      <div class="cart-btn">
+        <button id="openCart" class="btn btn-ghost">Ver carrito</button>
+        <span id="cartCount" class="badge" style="display:none">0</span>
+      </div>
+      <button id="adminToggle" class="btn btn-ghost">Ingresar como admin</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="adminPanel" class="admin-panel card">
+      <h3>Panel Admin</h3>
+      <p class="muted small">Agrega productos. Para imágenes usa rutas relativas: <code>./img/archivo.jpg</code> o URLs externas.</p>
+      <form id="productForm">
+        <label>Sección</label>
+        <input id="pSection" placeholder="Ej: Ropa, Accesorios..." required />
+
+        <label>Nombre del producto</label>
+        <input id="pName" required />
+
+        <label>Descripción</label>
+        <textarea id="pDesc" rows="3" required></textarea>
+
+        <label>Precio</label>
+        <input id="pPrice" type="number" step="0.01" required />
+
+        <label>URL de la imagen (ej: <code>./img/ejemplo.png</code>)</label>
+        <input id="pImage" type="url" required />
+
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+          <button type="submit" class="btn btn-primary">Agregar producto</button>
+          <button id="exportProducts" type="button" class="btn btn-ghost">Exportar JSON</button>
+          <button id="closeAdmin" type="button" class="btn btn-ghost">Cerrar panel</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Productos</h2>
+      <div id="products"></div>
+    </section>
+
+    <section style="margin-top:20px">
+      <h2>Carrito</h2>
+      <div id="cart" class="card" style="display:none;padding:12px"></div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button id="sendWhatsapp" class="btn btn-primary" style="display:none">Enviar por WhatsApp</button>
+        <button id="clearCart" class="btn btn-ghost" style="display:none">Vaciar carrito</button>
+      </div>
+    </section>
+
+    <footer>
+      <small>Instrucciones: subí imágenes a la carpeta <code>img/</code> y usá rutas como <code>./img/archivo.jpg</code> en el campo URL de la imagen.</small>
+    </footer>
+  </main>
+
+  <script>
+    // Config (cambiar si deseás)
+    const ADMIN_PASSWORD = '1168593804';
+    const WHATSAPP_NUMBER = '5491122806874';
+
+    // Storage keys
+    const KEY_PRODUCTS = 'tienda_products_final';
+    const KEY_CART = 'tienda_cart_final';
+    const KEY_IS_ADMIN = 'tienda_is_admin_final';
+
+    // Helpers
+    const saveProducts = (list) => localStorage.setItem(KEY_PRODUCTS, JSON.stringify(list));
+    const loadProducts = () => JSON.parse(localStorage.getItem(KEY_PRODUCTS) || '[]');
+    const saveCart = (cart) => localStorage.setItem(KEY_CART, JSON.stringify(cart));
+    const loadCart = () => JSON.parse(localStorage.getItem(KEY_CART) || '[]');
+    const setAdmin = (flag) => localStorage.setItem(KEY_IS_ADMIN, flag ? '1' : '0');
+    const isAdmin = () => localStorage.getItem(KEY_IS_ADMIN) === '1';
+
+    // DOM
+    const productsEl = document.getElementById('products');
+    const cartEl = document.getElementById('cart');
+    const cartCountEl = document.getElementById('cartCount');
+    const openCartBtn = document.getElementById('openCart');
+    const adminToggle = document.getElementById('adminToggle');
+    const adminPanel = document.getElementById('adminPanel');
+    const productForm = document.getElementById('productForm');
+    const sendWhatsapp = document.getElementById('sendWhatsapp');
+    const clearCartBtn = document.getElementById('clearCart');
+    const exportProductsBtn = document.getElementById('exportProducts');
+    const closeAdminBtn = document.getElementById('closeAdmin');
+    const pSection = document.getElementById('pSection');
+    const pName = document.getElementById('pName');
+    const pDesc = document.getElementById('pDesc');
+    const pPrice = document.getElementById('pPrice');
+    const pImage = document.getElementById('pImage');
+
+    function escapeHtml(s){ return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    // Render products grouped by section
+    function renderProducts(){
+      const list = loadProducts();
+      productsEl.innerHTML = '';
+      if(!list.length){
+        productsEl.innerHTML = '<div class="card">No hay productos. Ingresá como admin para agregar (contraseña en el código).</div>';
+        return;
+      }
+      const grouped = {};
+      list.forEach(p => {
+        const sec = p.section && p.section.trim() ? p.section.trim() : 'Sin sección';
+        if(!grouped[sec]) grouped[sec] = [];
+        grouped[sec].push(p);
+      });
+      Object.keys(grouped).forEach(sec => {
+        const h = document.createElement('h3'); h.className='section-title'; h.textContent = sec;
+        productsEl.appendChild(h);
+        const grid = document.createElement('div'); grid.className='grid';
+        grouped[sec].forEach((p, idx) => {
+          const card = document.createElement('div'); card.className='card';
+          card.innerHTML = `
+            <img class="prod" src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}" onerror="this.src='./img/ejemplo.png'">
+            <div class="title">${escapeHtml(p.name)}</div>
+            <div style="color:#475569;font-size:13px">${escapeHtml(p.desc)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+              <div class="price">$ ${Number(p.price).toFixed(2)}</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-primary" data-idx="${idx}" data-sec="${escapeHtml(sec)}">Agregar</button>
+                ${isAdmin() ? `<button class="btn btn-ghost" data-del="${idx}" data-sec="${escapeHtml(sec)}">Eliminar</button>` : ''}
+              </div>
+            </div>`;
+          grid.appendChild(card);
+        });
+        productsEl.appendChild(grid);
+      });
+      // attach listeners for add/delete (since idx is relative to section grouping, we handle by matching)
+      document.querySelectorAll('button[data-idx]').forEach(btn => btn.addEventListener('click', e => {
+        const sec = btn.getAttribute('data-sec');
+        const idx = Number(btn.getAttribute('data-idx'));
+        const p = loadProducts().filter(x=>((x.section&&x.section.trim()?x.section.trim():'Sin sección')===sec))[idx];
+        if(p) addToCart(p);
+      }));
+      document.querySelectorAll('button[data-del]').forEach(btn => btn.addEventListener('click', () => {
+        if(!isAdmin()) return alert('No autorizado');
+        if(!confirm('Eliminar producto?')) return;
+        const sec = btn.getAttribute('data-sec');
+        const idx = Number(btn.getAttribute('data-del'));
+        const all = loadProducts();
+        const grouped = {};
+        all.forEach((x,i)=>{const s=(x.section&&x.section.trim()?x.section.trim():'Sin sección'); if(!grouped[s]) grouped[s]=[]; grouped[s].push({item:x,index:i});});
+        const target = grouped[sec][idx];
+        if(target){ all.splice(target.index,1); saveProducts(all); renderProducts(); }
+      }));
+    }
+
+    function addToCart(product){
+      const cart = loadCart();
+      const found = cart.find(it => it.name===product.name && it.section===product.section && it.price==product.price);
+      if(found) found.qty = (found.qty||1) + 1;
+      else cart.push({...product, qty:1});
+      saveCart(cart); renderCart();
+    }
+
+    function renderCart(){
+      const cart = loadCart();
+      const count = cart.reduce((s,it)=>s+(it.qty||0),0);
+      if(count===0){ cartEl.style.display='none'; sendWhatsapp.style.display='none'; clearCartBtn.style.display='none'; cartCountEl.style.display='none'; cartEl.innerHTML=''; return; }
+      cartEl.style.display='block'; sendWhatsapp.style.display='inline-block'; clearCartBtn.style.display='inline-block'; cartCountEl.style.display='inline-block'; cartCountEl.textContent = count;
+      cartEl.innerHTML='';
+      let total=0;
+      cart.forEach((c,i)=>{
+        total += Number(c.price) * (c.qty||1);
+        const div=document.createElement('div');
+        div.style.display='flex'; div.style.justifyContent='space-between'; div.style.alignItems='center'; div.style.padding='6px 0';
+        div.innerHTML = `<div>${escapeHtml(c.name)} <small style="color:#546173">(${escapeHtml(c.section)})</small></div><div>$${Number(c.price).toFixed(2)} x${c.qty} <button data-inc="${i}" class="btn btn-ghost">+</button> <button data-dec="${i}" class="btn btn-ghost">-</button> <button data-rem="${i}" class="btn btn-ghost">Eliminar</button></div>`;
+        cartEl.appendChild(div);
+      });
+      const totalDiv=document.createElement('div'); totalDiv.style.marginTop='10px'; totalDiv.style.textAlign='right'; totalDiv.innerHTML=`<strong>Total: $ ${Number(total).toFixed(2)}</strong>`;
+      cartEl.appendChild(totalDiv);
+
+      cartEl.querySelectorAll('button[data-inc]').forEach(b=>b.addEventListener('click', ()=>{ const i=Number(b.getAttribute('data-inc')); const c=loadCart(); c[i].qty=(c[i].qty||1)+1; saveCart(c); renderCart(); }));
+      cartEl.querySelectorAll('button[data-dec]').forEach(b=>b.addEventListener('click', ()=>{ const i=Number(b.getAttribute('data-dec')); const c=loadCart(); c[i].qty=(c[i].qty||1)-1; if(c[i].qty<=0) c.splice(i,1); saveCart(c); renderCart(); }));
+      cartEl.querySelectorAll('button[data-rem]').forEach(b=>b.addEventListener('click', ()=>{ const i=Number(b.getAttribute('data-rem')); const c=loadCart(); c.splice(i,1); saveCart(c); renderCart(); }));
+    }
+
+    function buildWhatsappMessage(){
+      const cart = loadCart();
+      if(!cart.length) return '';
+      const lines=['Nueva orden desde la web:',''];
+      cart.forEach((c,i)=>{ lines.push(`${i+1}. ${c.name} (${c.section}) x${c.qty} - $${Number(c.price).toFixed(2)}`); });
+      const total = cart.reduce((s,it)=>s + Number(it.price)*(it.qty||1),0);
+      lines.push(''); lines.push(`Total: $${Number(total).toFixed(2)}`);
+      return encodeURIComponent(lines.join('\n'));
+    }
+
+    sendWhatsapp.addEventListener('click', ()=>{
+      const msg = buildWhatsappMessage();
+      if(!msg) return alert('Carrito vacío');
+      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`,'_blank');
+    });
+    clearCartBtn.addEventListener('click', ()=>{ if(confirm('Vaciar carrito?')){ saveCart([]); renderCart(); } });
+    openCartBtn.addEventListener('click', ()=>{ renderCart(); cartEl.scrollIntoView({behavior:'smooth'}); });
+
+    adminToggle.addEventListener('click', ()=>{
+      if(isAdmin()){ if(confirm('Cerrar sesión admin?')){ setAdmin(false); adminPanel.style.display='none'; renderProducts(); } return; }
+      const pw = prompt('Contraseña de admin:');
+      if(pw===ADMIN_PASSWORD){ setAdmin(true); adminPanel.style.display='block'; renderProducts(); alert('Ingresaste como admin.'); }
+      else alert('Contraseña incorrecta');
+    });
+
+    productForm.addEventListener('submit', e=>{
+      e.preventDefault();
+      if(!isAdmin()) return alert('No autorizado');
+      const p = { section: pSection.value.trim(), name: pName.value.trim(), desc: pDesc.value.trim(), price: Number(pPrice.value), image: pImage.value.trim() };
+      const list = loadProducts(); list.push(p); saveProducts(list); productForm.reset(); renderProducts();
+    });
+
+    exportProductsBtn.addEventListener('click', ()=>{
+      const data = loadProducts();
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='productos.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    closeAdminBtn.addEventListener('click', ()=>{ setAdmin(false); adminPanel.style.display='none'; renderProducts(); });
+
+    // On load: if no products, add an example product pointing to ./img/ejemplo.png
+    if(!loadProducts().length){
+      saveProducts([{section:'Ejemplo',name:'Camiseta demo',desc:'Producto de ejemplo. Reemplazá la imagen en ./img/ejemplo.png',price:1200,image:'./img/ejemplo.png'}]);
+    }
+
+    renderProducts(); renderCart();
+  </script>
+</body>
+</html>
